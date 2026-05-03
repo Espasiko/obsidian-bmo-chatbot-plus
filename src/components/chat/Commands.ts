@@ -7,6 +7,7 @@ import { getAbortController } from '../FetchModelResponse';
 import { fetchModelRenameTitle } from '../editor/FetchRenameNoteTitle';
 import { displayCommandBotMessage } from './BotMessage';
 import { addMessage } from './Message';
+import { startNewActiveConversation } from './Conversations';
 // Define handler function signatures
 type CommandHandler = (input: string, settings: BMOSettings, plugin: BMOGPT) => void | Promise<void>;
 
@@ -1286,6 +1287,12 @@ export async function removeMessageThread(plugin: BMOGPT, index: number) {
 
       // Update the lastLoadedChatHistoryPath for the current profile
       plugin.settings.profiles.lastLoadedChatHistory[profileIndex] = plugin.settings.profiles.lastLoadedChatHistoryPath;
+
+      // Multi-chat: open a fresh active Conversation when /clear is invoked from the start of the thread
+      if (index === 0) {
+          try { await startNewActiveConversation(plugin, messageHistory); }
+          catch (e) { console.warn('[BMO Chandra] startNewActiveConversation failed', e); }
+      }
 
       await plugin.saveSettings();
       new Notice('Chat history cleared.');

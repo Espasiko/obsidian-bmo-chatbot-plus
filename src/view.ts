@@ -19,6 +19,7 @@ import { fetchOpenAIAPIResponseStream,
         fetchOpenRouterResponseStream,
         fetchOpenRouterResponse,
         fetchGoogleGeminiResponseStream} from './components/FetchModelResponse';
+import { loadOrCreateActiveConversation, startNewActiveConversation, syncMessageHistoryToActive, resetActiveRuntime } from './components/chat/Conversations';
 
 export const VIEW_TYPE_CHATBOT = 'chatbot-view';
 export const ANTHROPIC_MODELS = ['claude-instant-1.2', 'claude-2.0', 'claude-2.1', 'claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-5-sonnet-20240620', 'claude-3-opus-20240229'];
@@ -579,7 +580,7 @@ export class BMOView extends ItemView {
     }
 
     async onClose() {
-        // Nothing to clean up.
+        resetActiveRuntime();
     }
 
 }
@@ -590,6 +591,7 @@ async function loadData(plugin: BMOGPT) {
         plugin.app.vault.adapter.mkdir('./.obsidian/plugins/bmo-chatbot/data/');
     }
 
+    // Legacy JSON load (kept for backward compat — Conversations module overrides below)
     if (await plugin.app.vault.adapter.exists(fileNameMessageHistoryJson(plugin))) {
         try {
             const fileContent = await plugin.app.vault.adapter.read(fileNameMessageHistoryJson(plugin));
@@ -605,6 +607,13 @@ async function loadData(plugin: BMOGPT) {
     } else {
         messageHistory = [];
     }
+
+    // Multi-chat: hydrate active Conversation (overrides messageHistory in-place if found)
+    try {
+        await loadOrCreateActiveConversation(plugin, messageHistory);
+    } catch (e) {
+        console.warn('[BMO Chandra] loadOrCreateActiveConversation failed', e);
+    }
 }
 
 // Delete all messages from the messageContainer and the messageHistory array
@@ -618,16 +627,23 @@ export async function deleteAllMessages(plugin: BMOGPT) {
         }
     }
 
-    // Clear the messageHistory array
-    messageHistory = [];
+    // Clear the messageHistory array (preserves reference)
+    messageHistory.splice(0, messageHistory.length);
 
-    // Write an empty array to the messageHistory.json file
+    // Write an empty array to the messageHistory.json file (legacy compat)
     const jsonString = JSON.stringify(messageHistory, null, 4);
 
     try {
         await plugin.app.vault.adapter.write(fileNameMessageHistoryJson(plugin), jsonString);
     } catch (error) {
         console.error('Error writing messageHistory.json', error);
+    }
+
+    // Multi-chat: open a fresh Conversation as active
+    try {
+        await startNewActiveConversation(plugin, messageHistory);
+    } catch (e) {
+        console.warn('[BMO Chandra] startNewActiveConversation failed', e);
     }
 }
 

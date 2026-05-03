@@ -294,8 +294,8 @@ export async function renameConversation(plugin: BMOGPT, conv: Conversation, new
 }
 
 // ---------------------------------------------------------------------------
-// Auto-title (lightweight: no extra LLM call yet — first user line truncated).
-// Hook for fetchModelRenameTitle is in main.ts integration step.
+// Auto-title (lightweight fallback: first user line truncated).
+// LLM-based title via fetchModelRenameTitle is wired in maybeGenerateAutoTitle.
 // ---------------------------------------------------------------------------
 
 export function deriveAutoTitle(conv: Conversation, maxLen = 60): string {
@@ -304,6 +304,178 @@ export function deriveAutoTitle(conv: Conversation, maxLen = 60): string {
     const oneLine = firstUser.content.replace(/\s+/g, ' ').trim();
     if (oneLine.length <= maxLen) return oneLine;
     return oneLine.slice(0, maxLen).trim() + '…';
+}
+
+// ---------------------------------------------------------------------------
+// Active conversation runtime state
+// ---------------------------------------------------------------------------
+// Single source of truth shared with the legacy `messageHistory` array in
+// view.ts: every change to that array is mirrored to the active Conversation
+// and persisted to its .md file. We never reassign messageHistory here (it is
+// `let` and externally referenced) — we mutate via splice in callers and pass
+// the array reference into syncMessageHistoryToActive().
+// ---------------------------------------------------------------------------
+
+let activeConversation: Conversation | null = null;
+let pendingAutoTitle = false;
+
+export function getActiveConversation(): Conversation | null {
+    return activeConversation;
+}
+
+export function setActiveConversation(conv: Conversation | null): void {
+    activeConversation = conv;
+}
+
+/** Persist current active conversation settings (path + id) to plugin data. */
+async function persistActiveSettings(plugin: BMOGPT): Promise<void> {
+    plugin.settings.conversations.activeId = activeConversation?.id ?? null;
+    plugin.settings.conversations.activeFilePath = activeConversation?.filePath ?? null;
+    try { await plugin.saveData(plugin.settings); } catch (e) { console.warn('[BMO Chandra] saveData failed', e); }
+}
+
+/**
+ * On view open: figure out which Conversation should be active.
+ * Priority:
+ *   1. settings.conversations.activeFilePath if file exists in vault.
+ *   2. Most recent conversation for the active profile.
+ *   3. New empty conversation seeded with current messageHistory[].
+ */
+export async function loadOrCreateActiveConversation(
+    plugin: BMOGPT,
+    messageHistoryRef: ConversationMessage[]
+): Promise<Conversation> {
+    const profile = plugin.settings.profiles.profile;
+    const activePath = plugin.settings.conversations.activeFilePath;
+
+    // 1) try the path stored in settings
+    if (activePath) {
+        const conv = await loadConversation(plugin, activePath);
+        if (conv && conv.profile === profile) {
+            activeConversation = conv;
+            replaceMessageHistory(messageHistoryRef, conv.messages);
+            return conv;
+        }
+    }
+
+    // 2) most recent for this profile
+    const all = await listConversations(plugin, profile);
+    if (all.length > 0) {
+        activeConversation = all[0];
+        replaceMessageHistory(messageHistoryRef, all[0].messages);
+        await persistActiveSettings(plugin);
+        return all[0];
+    }
+
+    // 3) start new, seeding from current messageHistory if any
+    const seed: ConversationMessage[] = (messageHistoryRef || []).slice();
+    const conv = newConversation(profile);
+    conv.messages = seed;
+    if (seed.length > 0) conv.title = deriveAutoTitle(conv);
+    await saveConversation(plugin, conv);
+    activeConversation = conv;
+    await persistActiveSettings(plugin);
+    return conv;
+}
+
+/** Replace contents of the live messageHistory array (preserves reference). */
+function replaceMessageHistory(target: ConversationMessage[], src: ConversationMessage[]): void {
+    target.splice(0, target.length, ...src.map((m) => ({
+        role: m.role,
+        content: m.content,
+        images: Array.isArray(m.images) ? m.images : []
+    })));
+}
+
+/** Persist the current message array to the active conversation's .md file. */
+export async function syncMessageHistoryToActive(
+    plugin: BMOGPT,
+    messageHistoryRef: ConversationMessage[]
+): Promise<void> {
+    if (!activeConversation) {
+        await loadOrCreateActiveConversation(plugin, messageHistoryRef);
+        if (!activeConversation) return;
+    }
+    activeConversation.messages = messageHistoryRef.map((m) => ({
+        role: m.role,
+        content: m.content,
+        images: Array.isArray(m.images) ? m.images : []
+    }));
+    try {
+        await saveConversation(plugin, activeConversation);
+        await persistActiveSettings(plugin);
+        pendingAutoTitle = true;
+    } catch (e) {
+        console.warn('[BMO Chandra] syncMessageHistoryToActive failed', e);
+    }
+}
+
+/** Start a fresh empty conversation and clear messageHistory in place. */
+export async function startNewActiveConversation(
+    plugin: BMOGPT,
+    messageHistoryRef: ConversationMessage[]
+): Promise<Conversation> {
+    const conv = newConversation(plugin.settings.profiles.profile);
+    activeConversation = conv;
+    replaceMessageHistory(messageHistoryRef, []);
+    await persistActiveSettings(plugin);
+    return conv;
+}
+
+/** Switch active to an existing conversation by file path. */
+export async function switchActiveConversation(
+    plugin: BMOGPT,
+    filePath: string,
+    messageHistoryRef: ConversationMessage[]
+): Promise<Conversation | null> {
+    const conv = await loadConversation(plugin, filePath);
+    if (!conv) return null;
+    activeConversation = conv;
+    replaceMessageHistory(messageHistoryRef, conv.messages);
+    await persistActiveSettings(plugin);
+    return conv;
+}
+
+/**
+ * Generate an LLM-based title once the conversation reaches >=2 turns and the
+ * current title is still default. Caller passes a generator function to avoid
+ * a circular import with FetchRenameNoteTitle.
+ */
+export async function maybeGenerateAutoTitle(
+    plugin: BMOGPT,
+    titleGenerator: (transcript: string) => Promise<string | null>
+): Promise<void> {
+    if (!plugin.settings.conversations.autoTitle) return;
+    if (!activeConversation) return;
+    if (!pendingAutoTitle) return;
+    if (activeConversation.messages.length < 2) return;
+    const isDefaultTitle = !activeConversation.title
+        || activeConversation.title === 'Nueva conversación'
+        || activeConversation.title.startsWith('[migrado]');
+    if (!isDefaultTitle) { pendingAutoTitle = false; return; }
+
+    const transcript = activeConversation.messages.slice(0, 4).map((m) => {
+        const role = m.role === 'user' ? 'USER' : m.role === 'assistant' ? 'ASSISTANT' : (m.role || 'SYSTEM').toUpperCase();
+        return `${role}: ${(m.content || '').slice(0, 800)}`;
+    }).join('\n\n');
+
+    pendingAutoTitle = false; // attempt once per pending mark
+    try {
+        const generated = await titleGenerator(transcript);
+        const cleaned = (generated || '').replace(/^["'\s]+|["'\s]+$/g, '').slice(0, 80);
+        if (cleaned && cleaned.length >= 3) {
+            await renameConversation(plugin, activeConversation, cleaned);
+            await persistActiveSettings(plugin);
+        }
+    } catch (e) {
+        console.warn('[BMO Chandra] auto-title failed', e);
+    }
+}
+
+/** Clear runtime state (used on plugin unload / view close). */
+export function resetActiveRuntime(): void {
+    activeConversation = null;
+    pendingAutoTitle = false;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,8 @@ import { fileNameMessageHistoryJson, messageHistory } from 'src/view';
 import { displayAppendButton, displayBotCopyButton, displayBotEditButton } from './Buttons';
 import BMOGPT, { BMOSettings } from 'src/main';
 import { getCurrentNoteContent } from '../editor/ReferenceCurrentNote';
+import { syncMessageHistoryToActive, maybeGenerateAutoTitle } from './Conversations';
+import { fetchModelRenameTitle } from '../editor/FetchRenameNoteTitle';
 import {htmlToMarkdown, setIcon } from 'obsidian';
 
 // Add a new message to the messageHistory array and save it to the file
@@ -81,6 +83,23 @@ export async function addMessage(plugin: BMOGPT, input: string, messageType: 'us
         messageHistory.splice(index + 1, 0, messageObj);
         const jsonString = JSON.stringify(messageHistory, null, 4);
         await plugin.app.vault.adapter.write(fileNameMessageHistoryJson(plugin), jsonString);
+
+        // Multi-chat: mirror to the active Conversation .md
+        try {
+            await syncMessageHistoryToActive(plugin, messageHistory);
+            if (messageType === 'botMessage' && plugin.settings.conversations.autoTitle) {
+                // Fire and forget: a single LLM title call when the conversation
+                // first reaches 2+ turns and still has the default title.
+                void maybeGenerateAutoTitle(plugin, async (transcript) => {
+                    try {
+                        const t = await fetchModelRenameTitle(settings, transcript);
+                        return typeof t === 'string' ? t : null;
+                    } catch { return null; }
+                });
+            }
+        } catch (syncErr) {
+            console.warn('[BMO Chandra] sync to active conversation failed', syncErr);
+        }
 
         const messageContainerEl = document.getElementById('messageContainer');
 
