@@ -4,6 +4,7 @@ import { BMOSettingTab } from './settings';
 import { promptSelectGenerateCommand, renameTitleCommand } from './components/editor/EditorCommands';
 import { colorToHex, isValidHexColor } from './utils/ColorConverter';
 import { bmoCodeBlockProcessor } from './components/editor/BMOCodeBlockProcessor';
+import { CONVERSATIONS_FOLDER_DEFAULT, migrateLegacyHistory } from './components/chat/Conversations';
 
 export interface BMOSettings {
 	profiles: {
@@ -46,7 +47,14 @@ export interface BMOSettings {
 		chatHistoryPath: string,
 		templateFilePath: string,
 		allowRenameNoteTitle: boolean,
-	}
+	},
+	conversations: {
+		folderPath: string,
+		activeId: string | null,
+		activeFilePath: string | null,
+		autoTitle: boolean,
+		sidebarVisible: boolean,
+	},
 	OllamaConnection: {
 		RESTAPIURL: string,
 		enableStream: boolean,
@@ -161,6 +169,13 @@ export const DEFAULT_SETTINGS: BMOSettings = {
 		templateFilePath: '',
 		allowRenameNoteTitle: false,
 	},
+	conversations: {
+		folderPath: CONVERSATIONS_FOLDER_DEFAULT,
+		activeId: null,
+		activeFilePath: null,
+		autoTitle: true,
+		sidebarVisible: false,
+	},
 	OllamaConnection: {
 		RESTAPIURL: 'http://localhost:11434',
 		enableStream: true,
@@ -240,6 +255,18 @@ export default class BMOGPT extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Multi-chat (Chandra Edition): one-shot migration of legacy per-profile history
+		try {
+			const migrated = await migrateLegacyHistory(this, this.settings.profiles.profile);
+			if (migrated) {
+				this.settings.conversations.activeId = migrated.id;
+				this.settings.conversations.activeFilePath = migrated.filePath;
+				await this.saveData(this.settings);
+			}
+		} catch (e) {
+			console.warn('[BMO Chandra] migrateLegacyHistory failed:', e);
+		}
 
 		const folderPath = this.settings.profiles.profileFolderPath || DEFAULT_SETTINGS.profiles.profileFolderPath;
 
