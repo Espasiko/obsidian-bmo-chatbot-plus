@@ -4,6 +4,7 @@ import BMOGPT, { BMOSettings } from 'src/main';
 import { getCurrentNoteContent } from '../editor/ReferenceCurrentNote';
 import { syncMessageHistoryToActive, maybeGenerateAutoTitle } from './Conversations';
 import { refreshSidebar } from './Sidebar';
+import { refreshConversationHeader } from './ConversationHeader';
 import { fetchModelRenameTitle } from '../editor/FetchRenameNoteTitle';
 import {htmlToMarkdown, setIcon } from 'obsidian';
 
@@ -96,8 +97,12 @@ export async function addMessage(plugin: BMOGPT, input: string, messageType: 'us
                         const t = await fetchModelRenameTitle(settings, transcript);
                         return typeof t === 'string' ? t : null;
                     } catch { return null; }
-                }).then(() => refreshSidebar(plugin));
+                }).then(() => {
+                    refreshConversationHeader();
+                    return refreshSidebar(plugin);
+                });
             }
+            refreshConversationHeader();
             void refreshSidebar(plugin);
         } catch (syncErr) {
             console.warn('[BMO Chandra] sync to active conversation failed', syncErr);

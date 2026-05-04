@@ -21,6 +21,7 @@ import { fetchOpenAIAPIResponseStream,
         fetchGoogleGeminiResponseStream} from './components/FetchModelResponse';
 import { loadOrCreateActiveConversation, startNewActiveConversation, syncMessageHistoryToActive, resetActiveRuntime } from './components/chat/Conversations';
 import { createConversationsSidebar, refreshSidebar, clearSidebarRuntime } from './components/chat/Sidebar';
+import { createConversationHeader, refreshConversationHeader, clearConversationHeaderRuntime } from './components/chat/ConversationHeader';
 
 export const VIEW_TYPE_CHATBOT = 'chatbot-view';
 export const ANTHROPIC_MODELS = ['claude-instant-1.2', 'claude-2.0', 'claude-2.1', 'claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-5-sonnet-20240620', 'claude-3-opus-20240229'];
@@ -105,6 +106,10 @@ export class BMOView extends ItemView {
         });
 
         header.appendChild(chatbotNameHeading);
+
+        // Active conversation editable title (between chatbot name and model dropdown)
+        createConversationHeader(this.plugin, header);
+
         header.appendChild(modelOptions);
 
         referenceCurrentNoteElement.appendChild(dotIndicator);
@@ -143,7 +148,11 @@ export class BMOView extends ItemView {
         // Multi-chat sidebar (visibility persisted in settings.conversations.sidebarVisible)
         createConversationsSidebar(this.plugin, chatbotContainer, async () => {
             renderMessageContainer(this.plugin, this.settings);
+            refreshConversationHeader();
         });
+
+        // Sync header title with the conversation loaded during loadData()
+        refreshConversationHeader();
 
         // Open notes/links from chatbot
         messageContainer.addEventListener('click', (event) => {
@@ -576,6 +585,7 @@ export class BMOView extends ItemView {
     async onClose() {
         resetActiveRuntime();
         clearSidebarRuntime();
+        clearConversationHeaderRuntime();
     }
 
 }

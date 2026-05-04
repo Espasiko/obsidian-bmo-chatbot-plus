@@ -11,6 +11,7 @@ import {
     startNewActiveConversation,
     switchActiveConversation
 } from './Conversations';
+import { refreshConversationHeader } from './ConversationHeader';
 
 // ============================================================================
 // CHANDRA EDITION · Conversations sidebar
@@ -207,6 +208,7 @@ function showItemMenu(plugin: BMOGPT, conv: Conversation, ev: MouseEvent): void 
             if (!next) return;
             try {
                 await renameConversation(plugin, conv, next);
+                refreshConversationHeader();
                 await refreshSidebar(plugin);
                 if (onSwitch) await onSwitch();
             } catch (e) {
