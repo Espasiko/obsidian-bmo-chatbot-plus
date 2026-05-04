@@ -8,6 +8,7 @@ import { fetchModelRenameTitle } from '../editor/FetchRenameNoteTitle';
 import { displayCommandBotMessage } from './BotMessage';
 import { addMessage } from './Message';
 import { startNewActiveConversation } from './Conversations';
+import { refreshSidebar } from './Sidebar';
 // Define handler function signatures
 type CommandHandler = (input: string, settings: BMOSettings, plugin: BMOGPT) => void | Promise<void>;
 
@@ -1290,8 +1291,10 @@ export async function removeMessageThread(plugin: BMOGPT, index: number) {
 
       // Multi-chat: open a fresh active Conversation when /clear is invoked from the start of the thread
       if (index === 0) {
-          try { await startNewActiveConversation(plugin, messageHistory); }
-          catch (e) { console.warn('[BMO Chandra] startNewActiveConversation failed', e); }
+          try {
+              await startNewActiveConversation(plugin, messageHistory);
+              void refreshSidebar(plugin);
+          } catch (e) { console.warn('[BMO Chandra] startNewActiveConversation failed', e); }
       }
 
       await plugin.saveSettings();

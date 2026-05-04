@@ -20,6 +20,7 @@ import { fetchOpenAIAPIResponseStream,
         fetchOpenRouterResponse,
         fetchGoogleGeminiResponseStream} from './components/FetchModelResponse';
 import { loadOrCreateActiveConversation, startNewActiveConversation, syncMessageHistoryToActive, resetActiveRuntime } from './components/chat/Conversations';
+import { createConversationsSidebar, refreshSidebar, clearSidebarRuntime } from './components/chat/Sidebar';
 
 export const VIEW_TYPE_CHATBOT = 'chatbot-view';
 export const ANTHROPIC_MODELS = ['claude-instant-1.2', 'claude-2.0', 'claude-2.1', 'claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-5-sonnet-20240620', 'claude-3-opus-20240229'];
@@ -137,18 +138,11 @@ export class BMOView extends ItemView {
         
         messageContainer.id = 'messageContainer';
         
-        messageHistory.forEach(async (messageData) => {   
-            if (messageData.role == 'user') {
-                const userMessageDiv = displayUserMessage(this.plugin, this.settings, messageData.content);
-                messageContainer.appendChild(userMessageDiv);
-            }
-        
-            if (messageData.role == 'assistant') {
-                const botMessageDiv = displayBotMessage(this.plugin, this.settings, messageHistory, messageData.content);
+        renderMessageContainer(this.plugin, this.settings);
 
-                updateUnresolvedInternalLinks(this.plugin, botMessageDiv);
-                messageContainer.appendChild(botMessageDiv);
-            }
+        // Multi-chat sidebar (visibility persisted in settings.conversations.sidebarVisible)
+        createConversationsSidebar(this.plugin, chatbotContainer, async () => {
+            renderMessageContainer(this.plugin, this.settings);
         });
 
         // Open notes/links from chatbot
@@ -581,8 +575,37 @@ export class BMOView extends ItemView {
 
     async onClose() {
         resetActiveRuntime();
+        clearSidebarRuntime();
     }
 
+}
+
+/**
+ * (Re)render the chat thread into #messageContainer from the current
+ * messageHistory array. Used both on first open and after a conversation
+ * switch from the sidebar.
+ */
+export function renderMessageContainer(plugin: BMOGPT, settings: BMOSettings): void {
+    const messageContainer = document.querySelector('#messageContainer') as HTMLDivElement | null;
+    if (!messageContainer) return;
+
+    while (messageContainer.firstChild) {
+        messageContainer.removeChild(messageContainer.firstChild);
+    }
+
+    messageHistory.forEach((messageData) => {
+        if (messageData.role === 'user') {
+            const userMessageDiv = displayUserMessage(plugin, settings, messageData.content);
+            messageContainer.appendChild(userMessageDiv);
+        }
+        if (messageData.role === 'assistant') {
+            const botMessageDiv = displayBotMessage(plugin, settings, messageHistory, messageData.content);
+            updateUnresolvedInternalLinks(plugin, botMessageDiv);
+            messageContainer.appendChild(botMessageDiv);
+        }
+    });
+
+    messageContainer.scrollTop = messageContainer.scrollHeight;
 }
 
 // Create data folder and load JSON file

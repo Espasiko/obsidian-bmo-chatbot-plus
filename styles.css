@@ -546,3 +546,241 @@ ul#dropdownOptions li:hover {
 	align-items: center;
 	text-align: center;
 }
+
+/* ============================================================================
+ * CHANDRA EDITION · Multi-chat sidebar
+ * ========================================================================== */
+
+.bmo-sidebar-toggle {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	z-index: 11;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.bmo-sidebar-toggle:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	border-color: var(--background-modifier-border);
+}
+
+.bmo-conversations-sidebar {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: 240px;
+	background: var(--background-secondary);
+	border-right: 1px solid var(--background-modifier-border);
+	transform: translateX(-100%);
+	transition: transform 0.2s ease;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.chatbotContainer.bmo-sidebar-open .bmo-conversations-sidebar {
+	transform: translateX(0);
+}
+
+.chatbotContainer.bmo-sidebar-open #header,
+.chatbotContainer.bmo-sidebar-open #referenceCurrentNote,
+.chatbotContainer.bmo-sidebar-open #messageContainer,
+.chatbotContainer.bmo-sidebar-open .chatbox {
+	margin-left: 240px;
+	transition: margin-left 0.2s ease;
+}
+
+.chatbotContainer #header,
+.chatbotContainer #referenceCurrentNote,
+.chatbotContainer #messageContainer,
+.chatbotContainer .chatbox {
+	transition: margin-left 0.2s ease;
+}
+
+.bmo-conversations-sidebar .sidebar-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 10px 6px 38px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.bmo-conversations-sidebar .sidebar-title {
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.bmo-conversations-sidebar .sidebar-close {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+}
+
+.bmo-conversations-sidebar .sidebar-close:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.bmo-conversations-sidebar .sidebar-new-chat {
+	margin: 8px 10px 6px;
+	padding: 8px 12px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 0.85rem;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+}
+
+.bmo-conversations-sidebar .sidebar-new-chat:hover {
+	filter: brightness(1.05);
+}
+
+.bmo-conversations-sidebar .sidebar-search {
+	margin: 0 10px 8px;
+	padding: 6px 10px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 5px;
+	color: var(--text-normal);
+	font-size: 0.85rem;
+}
+
+.bmo-conversations-sidebar .sidebar-search:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.bmo-conversations-sidebar .sidebar-list {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	padding: 4px 6px 8px;
+}
+
+.bmo-conversations-sidebar .sidebar-empty {
+	padding: 12px 10px;
+	color: var(--text-muted);
+	font-size: 0.8rem;
+	text-align: center;
+	font-style: italic;
+}
+
+.bmo-conversations-sidebar .sidebar-item {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 8px;
+	margin: 2px 0;
+	border-radius: 5px;
+	cursor: pointer;
+	color: var(--text-normal);
+	transition: background-color 0.1s ease;
+}
+
+.bmo-conversations-sidebar .sidebar-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.bmo-conversations-sidebar .sidebar-item.active {
+	background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+	box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+
+.bmo-conversations-sidebar .sidebar-item.pinned .item-title::before {
+	content: '📌 ';
+	font-size: 0.75em;
+}
+
+.bmo-conversations-sidebar .item-main {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.bmo-conversations-sidebar .item-title {
+	font-size: 0.85rem;
+	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	line-height: 1.3;
+}
+
+.bmo-conversations-sidebar .item-sub {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	margin-top: 2px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bmo-conversations-sidebar .item-menu {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	border-radius: 4px;
+	cursor: pointer;
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+
+.bmo-conversations-sidebar .sidebar-item:hover .item-menu {
+	visibility: visible;
+	opacity: 1;
+}
+
+.bmo-conversations-sidebar .item-menu:hover {
+	background: var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+/* Mobile / narrow viewports: sidebar overlays content instead of pushing it */
+@media (max-width: 700px) {
+	.chatbotContainer.bmo-sidebar-open #header,
+	.chatbotContainer.bmo-sidebar-open #referenceCurrentNote,
+	.chatbotContainer.bmo-sidebar-open #messageContainer,
+	.chatbotContainer.bmo-sidebar-open .chatbox {
+		margin-left: 0;
+	}
+
+	.bmo-conversations-sidebar {
+		box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+	}
+}
