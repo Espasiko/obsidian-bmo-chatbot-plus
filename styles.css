@@ -635,8 +635,10 @@ ul#dropdownOptions li:hover {
 	left: 0;
 	bottom: 0;
 	width: 240px;
+	max-width: 80%;
 	background: var(--background-secondary);
 	border-right: 1px solid var(--background-modifier-border);
+	box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
 	transform: translateX(-100%);
 	transition: transform 0.2s ease;
 	z-index: 10;
@@ -649,11 +651,14 @@ ul#dropdownOptions li:hover {
 	transform: translateX(0);
 }
 
+/* Sidebar ALWAYS overlays content (never push with margin-left).
+   The BMO panel inside Obsidian can be narrow even when the viewport is wide,
+   so margin-left: 240px breaks the layout in split panes and small panels. */
 .chatbotContainer.bmo-sidebar-open #header,
 .chatbotContainer.bmo-sidebar-open #referenceCurrentNote,
 .chatbotContainer.bmo-sidebar-open #messageContainer,
 .chatbotContainer.bmo-sidebar-open .chatbox {
-	margin-left: 240px;
+	margin-left: 0;
 	transition: margin-left 0.2s ease;
 }
 
@@ -825,16 +830,7 @@ ul#dropdownOptions li:hover {
 	color: var(--text-normal);
 }
 
-/* Mobile / narrow viewports: sidebar overlays content instead of pushing it */
-@media (max-width: 700px) {
-	.chatbotContainer.bmo-sidebar-open #header,
-	.chatbotContainer.bmo-sidebar-open #referenceCurrentNote,
-	.chatbotContainer.bmo-sidebar-open #messageContainer,
-	.chatbotContainer.bmo-sidebar-open .chatbox {
-		margin-left: 0;
-	}
-
-	.bmo-conversations-sidebar {
-		box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
-	}
-}
+/* NOTE: The sidebar now ALWAYS overlays (never pushes content).
+   The old @media (max-width: 700px) rule was removed because it only checked
+   viewport width, not the BMO panel width. In Obsidian split panes the panel
+   can be 300px wide while the viewport is 1920px — the media query never fired. */
