@@ -380,9 +380,11 @@ export async function fetchRESTAPIURLResponse(plugin: BMOGPT, settings: BMOSetti
     await getActiveFileContent(plugin, settings);
     const referenceCurrentNoteContent = getCurrentNoteContent();
  
+    abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController?.abort(), 120000);
+
     try {
-        const response = await requestUrl({
-            url: settings.RESTAPIURLConnection.RESTAPIURL + '/chat/completions',
+        const response = await fetch(settings.RESTAPIURLConnection.RESTAPIURL + '/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -397,9 +399,16 @@ export async function fetchRESTAPIURLResponse(plugin: BMOGPT, settings: BMOSetti
                 max_tokens: parseInt(settings.general.max_tokens) || -1,
                 temperature: parseInt(settings.general.temperature),
             }),
+            signal: abortController.signal,
         });
+        clearTimeout(timeoutId);
 
-        let message = response.json.choices[0].message.content;
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+
+        const responseData = await response.json();
+        let message = responseData.choices[0].message.content;
 
         const messageContainerEl = document.querySelector('#messageContainer');
         if (messageContainerEl) {
@@ -446,6 +455,9 @@ export async function fetchRESTAPIURLResponse(plugin: BMOGPT, settings: BMOSetti
         return;
 
     } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('[BMO] fetchRESTAPIURLResponse error:', error);
+
         const targetUserMessage = messageContainerElDivs[index];
         const targetBotMessage = targetUserMessage.nextElementSibling;
         targetBotMessage?.remove();
@@ -454,6 +466,8 @@ export async function fetchRESTAPIURLResponse(plugin: BMOGPT, settings: BMOSetti
         const botMessageDiv = displayErrorBotMessage(plugin, settings, messageHistory, error);
         messageContainer.appendChild(botMessageDiv);
 
+    } finally {
+        abortController = null;
     }
 }
 

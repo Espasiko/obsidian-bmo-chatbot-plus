@@ -640,15 +640,20 @@ ul#dropdownOptions li:hover {
 	border-right: 1px solid var(--background-modifier-border);
 	box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
 	transform: translateX(-100%);
-	transition: transform 0.2s ease;
+	transition: transform 0.2s ease, visibility 0s 0.2s;
 	z-index: 10;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
+	visibility: hidden;
+	pointer-events: none;
 }
 
 .chatbotContainer.bmo-sidebar-open .bmo-conversations-sidebar {
 	transform: translateX(0);
+	visibility: visible;
+	pointer-events: auto;
+	transition: transform 0.2s ease, visibility 0s 0s;
 }
 
 /* Sidebar ALWAYS overlays content (never push with margin-left).

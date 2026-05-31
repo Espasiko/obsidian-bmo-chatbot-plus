@@ -745,6 +745,39 @@ Fase 7 (empaquetado) — al final con todo listo
 - [ ] Configurar proveedores: Mistral, Groq, Gemini, DeepSeek, Ollama
 - [ ] BMO plugin: mostrar modelo activo en header
 
+#### Estado real (31/05/2026) — ya implementado en el proxy AgenteEscritor
+- [x] Router multi-proveedor por REST OpenAI-compatible (`requests`), 11+ proveedores:
+      mistral, groq, gemini, grok, openai, deepseek, openrouter, claude, kimi, minimax,
+      ollama, llamacpp. Seleccion por campo `model` ("proveedor:modelo") o `LLM_PROVIDER` en .env.
+- [x] `/v1/models` anuncia los modelos → aparecen en el selector nativo de BMO ("REST API Models").
+- [x] Solo Mistral validado con tools; los demas se activan poniendo su key en .env.
+- [x] **Modelos verificados en vivo 31/05/2026** — los IDs de OpenRouter cambian MUY rápido:
+      - Claude 3.x ELIMINADO de OR → ahora `anthropic/claude-sonnet-4.6`, `claude-haiku-4.5`
+      - Gemma 3 free ELIMINADO → ahora `google/gemma-4-31b-it:free`
+      - Groq: solo `llama-3.3-70b-versatile` activo; llama3-70b, gemma2, mixtral dan 400
+      - Modelos free OR activos: gemma-4-31b, llama-3.3-70b, deepseek-v4-flash, gpt-oss-120b
+      - Ollama local (Spas): `mistral-local:latest`, `salamandra-r1:q5km`, `qwen2.5-coder:1.5b-base`
+- [x] **Vault Miguel Ángel** entregado y operativo (novela histórica hitita):
+      BMO perfil Edi, openrouter:claude-sonnet-4.6, 4 templates dual-syntax, obsidian-git configurado
+- [x] Templates Templater con **sintaxis dual**: `tp.mcpTools ? ... : await tp.system.prompt()`
+      para funcionar tanto desde proxy (REST) como desde UI de Obsidian (Ctrl+P)
+
+#### PENDIENTE — Catálogo de modelos con precio + descripción (Cerebrito)
+> Hoy el selector muestra una lista plana de "proveedor:modelo". Para producto hace falta un
+> **catálogo curado y navegable**, porque groq/deepseek/openrouter tienen MUCHOS modelos.
+- [ ] Definir un catálogo (JSON) `model_catalog.json`: por cada modelo → `{id, proveedor,
+      nombre_amigable, precio_in/precio_out (€/1M tokens), velocidad, contexto, calidad,
+      descripcion_corta (1 línea), tags: [barato|potente|rápido|local|gratis|tools]}`.
+- [ ] Fuente de precios: tabla mantenida a mano + opción de refrescar desde OpenRouter
+      (`GET /api/v1/models` ya trae pricing) para los que pasan por OpenRouter.
+- [ ] UI BMO: selector agrupado por proveedor con **nombre amigable + precio + 1 línea**,
+      y filtros (barato / potente / gratis / local / con-tools). No volcar el listado crudo.
+- [ ] Marcar cuáles soportan tools (para no romper el agente al elegir uno que no las soporta).
+- [ ] Modelos gratis a destacar: OpenRouter `*:free` (Gemma, Llama), Groq (tier gratis),
+      Gemini Flash (free tier), Ollama/llama.cpp (local, gratis).
+- [ ] Recomendados por defecto: Mistral Large (tools OK), DeepSeek (barato+bueno),
+      Kimi K2 (barato+fuerte), Gemini Flash (rápido+gratis), Groq (rápido).
+
 ### Fase 3 — UI del plugin BMO
 - [ ] Boton `+` en la barra de input con menu desplegable
 - [ ] Prefijos `@ / # *` con autocompletado

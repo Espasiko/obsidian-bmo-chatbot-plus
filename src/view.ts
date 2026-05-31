@@ -435,6 +435,7 @@ export class BMOView extends ItemView {
                             this.preventEnter = false;
                         })
                         .catch(() => {
+                            this.preventEnter = false;
                             const messageContainer = document.querySelector('#messageContainer') as HTMLDivElement;
                             const botMessageDiv = displayErrorBotMessage(this.plugin, this.settings, messageHistory, 'Oops, something went wrong. Please try again.');
                             messageContainer.appendChild(botMessageDiv);

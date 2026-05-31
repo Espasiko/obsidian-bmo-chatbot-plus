@@ -1,10 +1,12 @@
 # Fase 0 — Plan de Estabilización (Cerebrito)
 
-**Fecha:** 26/05/2026
-**Estado:** PLAN — NO EJECUTAR todavía
+**Fecha:** 26/05/2026 · **Última actualización:** 31/05/2026
+**Estado:** PENDIENTE — vault Miguel Ángel ✅ entregado; Fase 0 repos aún sin ejecutar
 **Aprobación:** Pendiente revisión por Spas
 **Duración estimada:** 1-2 días de trabajo distribuidos
 
+**!!IDEA IMPORTANTE NUEVA!!**
+DEBEMOS CREAR/ACTUALIZAR EL AGENTE QUE CONOCE EL PROYECTO, SKILL YA CREADO PARA CONOCER EL PROYECTO, DEV AGENT QUE ESTA SIEMPRE AL TENTO Y SUSTITUYE CHANDRA EN OPOS_PROJECT, EL STAFF AGENT. DESARROLLAR PLAN Y CREAR FORK O REPO NUEVO! Y CREAR YA VAULT PARA MIGUEL ÁNGEL! Y EL GIT PARA ACTUALIZACIONESSIEMPRE, KUZU PARA GRAN INFO Y PDF- DOCS PARA ESCRITORES ARREGALARLO YA! 
 ---
 
 ## Resumen ejecutivo
