@@ -24,3 +24,6 @@ data/*
 
 # Version
 version-bump.mjs
+
+# Graphify (regenerable, no se commitea)
+graphify-out/
