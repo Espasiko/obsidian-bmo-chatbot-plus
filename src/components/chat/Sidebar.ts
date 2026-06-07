@@ -82,6 +82,11 @@ export function createConversationsSidebar(
             await startNewActiveConversation(plugin, messageHistory);
             if (onSwitch) await onSwitch();
             await refreshSidebar(plugin);
+            // Re-focus textarea after sidebar action
+            setTimeout(() => {
+                const ta = document.querySelector('.chatbox textarea') as HTMLTextAreaElement;
+                if (ta) ta.focus();
+            }, 150);
         } catch (e) {
             console.warn('[BMO Chandra] new chat failed', e);
             new Notice('No se pudo crear nueva conversación');

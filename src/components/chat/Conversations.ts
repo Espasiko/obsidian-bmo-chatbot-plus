@@ -367,14 +367,14 @@ export async function loadOrCreateActiveConversation(
         return all[0];
     }
 
-    // 3) start new, seeding from current messageHistory if any
-    const seed: ConversationMessage[] = (messageHistoryRef || []).slice();
+    // 3) No conversations yet: start a brand-new EMPTY conversation (in-memory; persisted on
+    //    first message via syncMessageHistoryToActive). IMPORTANT: do NOT seed from the legacy
+    //    messageHistory[] — that made a just-deleted conversation "reappear" on reopen, because
+    //    the legacy JSON is re-read on every loadData(). Legacy history is migrated once via
+    //    migrateLegacyHistory() (main.ts onload), so nothing is lost by starting empty here.
+    replaceMessageHistory(messageHistoryRef, []);
     const conv = newConversation(profile);
-    conv.messages = seed;
-    if (seed.length > 0) conv.title = deriveAutoTitle(conv);
-    await saveConversation(plugin, conv);
     activeConversation = conv;
-    await persistActiveSettings(plugin);
     return conv;
 }
 

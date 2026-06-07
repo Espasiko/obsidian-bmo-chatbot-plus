@@ -19,7 +19,7 @@ import { fetchOpenAIAPIResponseStream,
         fetchOpenRouterResponseStream,
         fetchOpenRouterResponse,
         fetchGoogleGeminiResponseStream} from './components/FetchModelResponse';
-import { loadOrCreateActiveConversation, startNewActiveConversation, syncMessageHistoryToActive, resetActiveRuntime, listConversations, switchActiveConversation } from './components/chat/Conversations';
+import { loadOrCreateActiveConversation, startNewActiveConversation, syncMessageHistoryToActive, resetActiveRuntime } from './components/chat/Conversations';
 import { createConversationsSidebar, refreshSidebar, clearSidebarRuntime } from './components/chat/Sidebar';
 import { createConversationHeader, refreshConversationHeader, clearConversationHeaderRuntime } from './components/chat/ConversationHeader';
 
@@ -140,24 +140,15 @@ export class BMOView extends ItemView {
         }
         
         await loadData(this.plugin);
-
-        // FIX UX: al abrir siempre arrancar conversación NUEVA (vacía). La última
-        // queda accesible desde la barra lateral o el botón "Continuar última".
-        await startNewActiveConversation(this.plugin, messageHistory);
-
+        
         messageContainer.id = 'messageContainer';
-
+        
         renderMessageContainer(this.plugin, this.settings);
 
         // Multi-chat sidebar (visibility persisted in settings.conversations.sidebarVisible)
         createConversationsSidebar(this.plugin, chatbotContainer, async () => {
             renderMessageContainer(this.plugin, this.settings);
             refreshConversationHeader();
-            // Tras Nuevo chat / borrar la conversacion activa el chat queda vacio y el bug
-            // nativo de teclado reaparece: aplicar la patada de oclusion solo en ese caso.
-            if (messageHistory.length === 0) {
-                this.kickKeyboardOcclusion('switch-empty');
-            }
         });
 
         // Sync header title with the conversation loaded during loadData()
@@ -246,24 +237,15 @@ export class BMOView extends ItemView {
         messageContainer.scrollTop = messageContainer.scrollHeight;
 
         // Force focus on textarea after Obsidian finishes layout.
-        // FIX 07/06/2026 (CONFIRMADO): el bug es NATIVO de Electron — el teclado no se enruta
-        // al textarea de la barra lateral hasta una OCLUSION de ventana (minimizar->restaurar).
-        // El resize NO lo arregla; minimizar SI (confirmado por el usuario). Por eso aqui, cuando
-        // el chat esta VACIO (unico caso roto: conversacion nueva / tras borrar la activa), se
-        // dispara `kickKeyboardOcclusion()`. Si hay mensajes, el teclado ya funciona y no se toca.
+        // Multiple delays because Obsidian's workspace layout is async and
+        // can steal focus from sidebar leaves during initialization.
         const focusTextarea = () => {
             if (this.textareaElement && document.body.contains(this.textareaElement)) {
                 this.textareaElement.focus();
             }
         };
-        this.app.workspace.onLayoutReady(() => {
-            requestAnimationFrame(focusTextarea);
-            setTimeout(focusTextarea, 150);
-            setTimeout(focusTextarea, 500);
-            if (messageHistory.length === 0) {
-                setTimeout(() => this.kickKeyboardOcclusion('open-empty'), 200);
-            }
-        });
+        setTimeout(focusTextarea, 100);
+        setTimeout(focusTextarea, 500);
 
         // Also re-focus when user clicks anywhere in the chatbox area
         chatbox.addEventListener('click', (e) => {
@@ -279,40 +261,6 @@ export class BMOView extends ItemView {
         this.textareaElement.addEventListener('keydown', this.handleKeydown.bind(this));
         this.textareaElement.addEventListener('input', this.handleInput.bind(this));
         this.textareaElement.addEventListener('blur', this.handleBlur.bind(this));
-    }
-
-    // Acceso seguro a la ventana Electron (BrowserWindow) desde el renderer de Obsidian.
-    getElectronWindowSafe(): any {
-        try {
-            const req = (window as any).require;
-            if (typeof req !== 'function') return null;
-            let remote: any = null;
-            try { remote = req('@electron/remote'); } catch { /* no disponible */ }
-            if (!remote || !remote.getCurrentWindow) {
-                try { remote = req('electron')?.remote; } catch { /* no disponible */ }
-            }
-            return remote?.getCurrentWindow?.() ?? null;
-        } catch { return null; }
-    }
-
-    // Arreglo del bug nativo de teclado: una OCLUSION de ventana (minimizar->restaurar) re-enruta
-    // el teclado al textarea. Es lo unico que funciona (el resize no). Se llama solo cuando el
-    // chat esta vacio. restore() preserva el estado maximizado previo en Windows.
-    kickKeyboardOcclusion(_reason: string): void {
-        const focusTa = () => {
-            if (this.textareaElement && document.body.contains(this.textareaElement)) {
-                this.textareaElement.focus();
-            }
-        };
-        const win = this.getElectronWindowSafe();
-        if (!win || typeof win.minimize !== 'function') { focusTa(); return; }
-        try {
-            win.minimize();
-            setTimeout(() => {
-                try { win.restore(); win.focus(); win.webContents?.focus?.(); } catch { /* ignore */ }
-                focusTa();
-            }, 120);
-        } catch { focusTa(); }
     }
     
     async handleKeyup(event: KeyboardEvent, fromSubmitButton = false) {
@@ -678,48 +626,17 @@ export function renderMessageContainer(plugin: BMOGPT, settings: BMOSettings): v
         messageContainer.removeChild(messageContainer.firstChild);
     }
 
-    if (messageHistory.length === 0) {
-        // Pantalla de bienvenida para conversación nueva
-        const welcomeWrapper = document.createElement('div');
-        welcomeWrapper.className = 'bmo-welcome';
-        welcomeWrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:2rem;text-align:center;height:100%;';
-
-        const greeting = document.createElement('div');
-        greeting.className = 'botMessage';
-        greeting.style.cssText = 'padding:1rem;border-radius:8px;max-width:80%;margin:0;';
-        greeting.textContent = settings.general.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte hoy?';
-        welcomeWrapper.appendChild(greeting);
-
-        // Botón "Continuar última conversación"
-        const continueBtn = document.createElement('button');
-        continueBtn.textContent = 'Continuar última conversación';
-        continueBtn.className = 'bmo-continue-btn';
-        continueBtn.style.cssText = 'padding:0.5rem 1rem;border-radius:4px;cursor:pointer;background:var(--interactive-accent);color:var(--text-on-accent);border:none;font-size:0.9rem;';
-        continueBtn.addEventListener('click', async () => {
-            const profile = settings.profiles.profile;
-            const convs = await listConversations(plugin, profile);
-            if (convs.length > 0 && convs[0].filePath) {
-                await switchActiveConversation(plugin, convs[0].filePath, messageHistory);
-                renderMessageContainer(plugin, settings);
-                refreshConversationHeader();
-            }
-        });
-        welcomeWrapper.appendChild(continueBtn);
-
-        messageContainer.appendChild(welcomeWrapper);
-    } else {
-        messageHistory.forEach((messageData) => {
-            if (messageData.role === 'user') {
-                const userMessageDiv = displayUserMessage(plugin, settings, messageData.content);
-                messageContainer.appendChild(userMessageDiv);
-            }
-            if (messageData.role === 'assistant') {
-                const botMessageDiv = displayBotMessage(plugin, settings, messageHistory, messageData.content);
-                updateUnresolvedInternalLinks(plugin, botMessageDiv);
-                messageContainer.appendChild(botMessageDiv);
-            }
-        });
-    }
+    messageHistory.forEach((messageData) => {
+        if (messageData.role === 'user') {
+            const userMessageDiv = displayUserMessage(plugin, settings, messageData.content);
+            messageContainer.appendChild(userMessageDiv);
+        }
+        if (messageData.role === 'assistant') {
+            const botMessageDiv = displayBotMessage(plugin, settings, messageHistory, messageData.content);
+            updateUnresolvedInternalLinks(plugin, botMessageDiv);
+            messageContainer.appendChild(botMessageDiv);
+        }
+    });
 
     messageContainer.scrollTop = messageContainer.scrollHeight;
 }

@@ -1,4 +1,4 @@
-import { DataWriteOptions, Plugin, TFile} from 'obsidian';
+import { DataWriteOptions, Notice, Plugin, TFile} from 'obsidian';
 import { BMOView, VIEW_TYPE_CHATBOT, populateModelDropdown } from './view';
 import { BMOSettingTab } from './settings';
 import { promptSelectGenerateCommand, renameTitleCommand } from './components/editor/EditorCommands';
@@ -19,6 +19,7 @@ export interface BMOSettings {
 		max_tokens: string,
 		temperature: string,
 		enableReferenceCurrentNote: boolean,
+		welcomeMessage: string,
 	},
 	appearance: {
 		userName: string,
@@ -140,6 +141,7 @@ export const DEFAULT_SETTINGS: BMOSettings = {
 		max_tokens: '',
 		temperature: '1.00',
 		enableReferenceCurrentNote: false,
+		welcomeMessage: '¡Hola! ¿En qué puedo ayudarte hoy?',
 	},
 	appearance: {
 		userName: 'YOU',
@@ -174,7 +176,7 @@ export const DEFAULT_SETTINGS: BMOSettings = {
 		activeId: null,
 		activeFilePath: null,
 		autoTitle: true,
-		sidebarVisible: false,
+		sidebarVisible: true,
 	},
 	OllamaConnection: {
 		RESTAPIURL: 'http://localhost:11434',
@@ -334,7 +336,7 @@ export default class BMOGPT extends Plugin {
 
 				if (file instanceof TFile && file.path.startsWith(this.settings.chatHistory.chatHistoryPath)) {
 					const currentProfile = this.settings.profiles.profile.replace(/\.[^/.]+$/, ''); // Removing the file extension
-					
+
 					// Finding the index of the currentProfile in the profileFiles array
 					const profileIndex = profileFiles.findIndex((file) => file.basename === currentProfile);
 
@@ -346,7 +348,8 @@ export default class BMOGPT extends Plugin {
 
 					if (profileIndex === currentIndex) {
 						this.settings.profiles.lastLoadedChatHistoryPath = null;
-					} 
+					}
+					await this.saveSettings();
 				}
 
 				if (file instanceof TFile && file.path.startsWith(folderPath)) {
@@ -371,9 +374,9 @@ export default class BMOGPT extends Plugin {
 
 							// Sorting the files array alphabetically by file name
 							profileFiles.sort((a, b) => a.name.localeCompare(b.name));
-					
+
 							const currentProfile = this.settings.profiles.profile.replace(/\.[^/.]+$/, ''); // Removing the file extension
-					
+
 							// Finding the index of the currentProfile in the profileFiles array
 							const profileIndex = profileFiles.findIndex((file) => file.basename === currentProfile);
 
@@ -386,8 +389,8 @@ export default class BMOGPT extends Plugin {
 							await updateSettingsFromFrontMatter(this, defaultProfile);
 						}
 					}
+					await this.saveSettings();
 				}
-				await this.saveSettings();
 			}
 		));
 
@@ -508,6 +511,51 @@ export default class BMOGPT extends Plugin {
             hotkeys: [
 				{
 					modifiers: ['Mod'],
+					key: '0',
+				},
+            ],
+        });
+
+		// Arreglo manual del bug de teclado: minimizar+restaurar la ventana Electron es lo
+		// unico que re-enruta el teclado al textarea (segun diagnostico). Este comando lo
+		// hace de forma programatica en 1 clic, ademas de confirmar el mecanismo.
+		this.addCommand({
+            id: 'bmo-fix-keyboard',
+            name: 'Forzar teclado del chat (minimizar/restaurar)',
+            callback: () => {
+                const focusBmoTextarea = () => {
+                    const ta = document.querySelector('.chatbox textarea') as HTMLTextAreaElement | null;
+                    ta?.focus();
+                };
+                let win: any = null;
+                try {
+                    const req = (window as any).require;
+                    if (typeof req === 'function') {
+                        let remote: any = null;
+                        try { remote = req('@electron/remote'); } catch { /* no disponible */ }
+                        if (!remote || !remote.getCurrentWindow) {
+                            try { remote = req('electron')?.remote; } catch { /* no disponible */ }
+                        }
+                        win = remote?.getCurrentWindow?.() ?? null;
+                    }
+                } catch { /* no disponible */ }
+                if (win && typeof win.minimize === 'function') {
+                    try {
+                        win.minimize();
+                        setTimeout(() => {
+                            try { win.restore(); win.focus(); win.webContents?.focus?.(); } catch { /* ignore */ }
+                            focusBmoTextarea();
+                        }, 120);
+                    } catch { focusBmoTextarea(); }
+                } else {
+                    try { window.blur(); window.focus(); } catch { /* ignore */ }
+                    focusBmoTextarea();
+                    new Notice('BMO: sin acceso a la ventana Electron (remote no disponible)');
+                }
+            },
+            hotkeys: [
+				{
+					modifiers: ['Mod', 'Shift'],
 					key: '0',
 				},
             ],
@@ -1002,15 +1050,19 @@ export async function updateProfile(plugin: BMOGPT, file: TFile) {
 				const textarea = document.querySelector('.chatbox textarea') as HTMLElement;
 				if (textarea) {
 					textarea.style.color = plugin.settings.appearance.chatBoxFontColor;
-					
-					// Set the placeholder color to the default value
-					const style = document.createElement('style');
-					style.textContent = `
+
+					// Set the placeholder color — reuse single style element in head
+					let placeholderStyle = document.getElementById('bmo-placeholder-style');
+					if (!placeholderStyle) {
+						placeholderStyle = document.createElement('style');
+						placeholderStyle.id = 'bmo-placeholder-style';
+						document.head.appendChild(placeholderStyle);
+					}
+					placeholderStyle.textContent = `
 						.chatbox textarea::placeholder {
 							color: ${plugin.settings.appearance.chatBoxFontColor} !important;
 						}
 					`;
-					textarea.appendChild(style);
 				}
 			} else {
 				plugin.settings.appearance.chatBoxFontColor = colorToHex(DEFAULT_SETTINGS.appearance.chatBoxFontColor);
@@ -1020,15 +1072,19 @@ export async function updateProfile(plugin: BMOGPT, file: TFile) {
                 
                 if (textarea) {
                     textarea.style.color = DEFAULT_SETTINGS.appearance.chatBoxFontColor;
-                    
-                    // Set the placeholder color to the selected value
-                    const style = document.createElement('style');
-                    style.textContent = `
+
+                    // Set the placeholder color — reuse single style element in head
+                    let placeholderStyle = document.getElementById('bmo-placeholder-style');
+                    if (!placeholderStyle) {
+                        placeholderStyle = document.createElement('style');
+                        placeholderStyle.id = 'bmo-placeholder-style';
+                        document.head.appendChild(placeholderStyle);
+                    }
+                    placeholderStyle.textContent = `
                         .chatbox textarea::placeholder {
                             color: ${defaultChatBoxFontColor} !important;
                         }
                     `;
-                    textarea.appendChild(style);
                 }
 			}
 

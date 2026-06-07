@@ -390,16 +390,19 @@ export function addAppearanceSettings(containerEl: HTMLElement, plugin: BMOGPT, 
             const textarea = document.querySelector('.chatbox textarea') as HTMLElement;
             if (textarea) {
                 textarea.style.color = defaultValue;
-                
-                // Set the placeholder color to the default value
-                const style = document.createElement('style');
-                style.textContent = `
+
+                let placeholderStyle = document.getElementById('bmo-placeholder-style');
+                if (!placeholderStyle) {
+                    placeholderStyle = document.createElement('style');
+                    placeholderStyle.id = 'bmo-placeholder-style';
+                    document.head.appendChild(placeholderStyle);
+                }
+                placeholderStyle.textContent = `
                     .chatbox textarea::placeholder {
                         color: ${defaultValue} !important;
                     }
                 `;
-                textarea.appendChild(style);
-                
+
                 await plugin.saveSettings();
             }
         })
@@ -422,15 +425,18 @@ export function addAppearanceSettings(containerEl: HTMLElement, plugin: BMOGPT, 
                 
                 if (textarea) {
                     textarea.style.color = hexValue;
-                    
-                    // Set the placeholder color to the selected value
-                    const style = document.createElement('style');
-                    style.textContent = `
+
+                    let placeholderStyle = document.getElementById('bmo-placeholder-style');
+                    if (!placeholderStyle) {
+                        placeholderStyle = document.createElement('style');
+                        placeholderStyle.id = 'bmo-placeholder-style';
+                        document.head.appendChild(placeholderStyle);
+                    }
+                    placeholderStyle.textContent = `
                         .chatbox textarea::placeholder {
                             color: ${hexValue} !important;
                         }
                     `;
-                    textarea.appendChild(style);
                 }
                 await plugin.saveSettings();
             });

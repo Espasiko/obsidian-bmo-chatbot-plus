@@ -201,4 +201,16 @@ export async function addGeneralSettings(containerEl: HTMLElement, plugin: BMOGP
                 }
             })
         );
+
+    new Setting(settingsContainer)
+        .setName('Welcome Message')
+        .setDesc('Message shown when starting a new conversation.')
+        .addText(text => text
+            .setPlaceholder('Enter welcome message')
+            .setValue(plugin.settings.general.welcomeMessage || DEFAULT_SETTINGS.general.welcomeMessage)
+            .onChange(async (value) => {
+                plugin.settings.general.welcomeMessage = value ? value : DEFAULT_SETTINGS.general.welcomeMessage;
+                await plugin.saveSettings();
+            })
+        );
 }
