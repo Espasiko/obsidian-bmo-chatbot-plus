@@ -168,3 +168,40 @@ gratis; DeepSeek/OpenAI/Claude de pago), y cómo transcribir apuntes a mano con 
 ### 11d. Aviso de entrega
 - El `.env` entregado a Miguel lleva **las API keys personales de Spas** (consumo de su cuenta).
   Pendiente: que Miguel saque las suyas con la guía LEEME (Mistral/Gemini/Groq gratis).
+
+### 11e. Perfil "Investigador" + 2 arreglos del proxy (07/06)
+- **Perfil `Investigador.md`** creado en el vault de Miguel: persona Dra. al-Rashid (arqueóloga/historiadora
+  de Oriente Próximo) adaptada a las **tools reales** del agente (DeepSearch→`search_internet`+`fetch_url`,
+  memoria→vault con `find_similar_notes`/`create_obsidian_note`), guardrails anti-alucinación (✅⚠️🔍❓),
+  formato de salida y bibliografía validada. Modelo por defecto `gemini:gemini-flash-latest` (1M ctx).
+  Se invoca eligiendo el perfil "Investigador" en el selector de perfiles de BMO. Basado en
+  `docs_planes/planes_investigciones/` (guía maestra + prompts por modelo).
+- **Proxy fix 1 — auto-recarga del `.env`:** si una key falta, `_chat_completion` recarga el `.env`
+  (override) y reintenta. **Resuelve el bug "Falta DEEPSEEK_API_KEY" aunque esté en el .env** (pasaba
+  porque el .exe lee el .env solo al arrancar; ahora se recarga en caliente).
+- **Proxy fix 2 — guard inteligente:** distingue el **rate-limit por minuto de Groq** (8K TPM →
+  "proveedor saturado, usa Gemini/Mistral") del **contexto real** ("texto largo, por partes"). Antes
+  el mensaje mentía diciendo "contexto largo" cuando era el límite por minuto de Groq.
+- **Textos largos:** usar `gemini:gemini-flash-latest` (~1M) o `mistral-large` (128K). Groq gratis NO.
+  Verificado en web jun-2026: Gemini 2.5 Pro 2M · DeepSeek V4 1M · Kimi K2.5 256K · Mistral Large 3 128K.
+
+### 11f. El bug 401 de la REST API — RESUELTO (era alucinación del modelo)
+**Diagnóstico por logs (`/mnt/d/AgenteEscritor_Miguel_Angel/logs/`):**
+- **0 errores 401 desde el 02/06/2026.** Los 40 que había son del 30/05–02/06 (ya pasados).
+- `create_obsidian_note` llamado 55 veces, **6 notas creadas con ÉXITO**. La REST API FUNCIONA.
+- El "401" que reportó el usuario el 13/06 **lo inventó el modelo**: el log muestra 0 llamadas a
+  herramientas en esa petición → el modelo describió un 401 genérico (incluso "Local REST API with
+  MCP") sin tocar la API. Era alucinación, no la apirest.
+
+**Problemas reales detectados en logs y arreglados (rebuild 13/06):**
+1. **Modelo no llama tools / inventa errores** → regla global en `build_critical_context()`:
+   prohíbe inventar errores de tools, obliga a llamarlas, prohíbe pedir API key o hablar de
+   "Local REST API". Recuerda que `create_obsidian_note` necesita `filename`+`content`.
+2. **Mistral HTTP 429 "Rate limit exceeded" (28 veces)** rompía el bucle del agente → `_chat_completion`
+   ahora **reintenta ante 429** con backoff (3s, 6s). La key nueva de Mistral tiene límite ~1 req/seg.
+3. **Modelo llamaba `read_obsidian_note` sin `filename`** (6 veces) → cubierto por la regla global.
+
+### 11g. Perfiles vs modelos en BMO (aclaración)
+- El **desplegable del chat** = solo MODELOS (agente-escritor, mistral, gemini…).
+- El **PERFIL** se cambia en BMO → ⚙️ Ajustes → "Profile" (lista los .md de `BMO/Profiles/`).
+  Al elegir "Investigador" carga su system prompt + su modelo por defecto. Son 2 controles distintos.
