@@ -22,6 +22,7 @@ import { fetchOpenAIAPIResponseStream,
 import { loadOrCreateActiveConversation, startNewActiveConversation, syncMessageHistoryToActive, resetActiveRuntime, listConversations, switchActiveConversation } from './components/chat/Conversations';
 import { createConversationsSidebar, refreshSidebar, clearSidebarRuntime } from './components/chat/Sidebar';
 import { createConversationHeader, refreshConversationHeader, clearConversationHeaderRuntime } from './components/chat/ConversationHeader';
+import { ChatAutocomplete } from './components/chat/Autocomplete';
 
 export const VIEW_TYPE_CHATBOT = 'chatbot-view';
 export const ANTHROPIC_MODELS = ['claude-instant-1.2', 'claude-2.0', 'claude-2.1', 'claude-3-haiku-20240307', 'claude-3-sonnet-20240229', 'claude-3-5-sonnet-20240620', 'claude-3-opus-20240229'];
@@ -49,6 +50,7 @@ export class BMOView extends ItemView {
     private textareaElement: HTMLTextAreaElement;
     private preventEnter = false;
     private plugin: BMOGPT;
+    private autocomplete: ChatAutocomplete | null = null;
 
     constructor(leaf: WorkspaceLeaf, settings: BMOSettings, plugin: BMOGPT) {
         super(leaf);
@@ -241,6 +243,7 @@ export class BMOView extends ItemView {
 
         this.textareaElement = textarea as HTMLTextAreaElement;
         this.addEventListeners();
+        this.autocomplete = new ChatAutocomplete(this.plugin, this.textareaElement, chatbox);
 
         // Scroll to bottom of messageContainer
         messageContainer.scrollTop = messageContainer.scrollHeight;
@@ -316,6 +319,11 @@ export class BMOView extends ItemView {
     }
     
     async handleKeyup(event: KeyboardEvent, fromSubmitButton = false) {
+        // Autocompletado (@agentes / comandos): si el popup consume la tecla, no enviar.
+        if (this.autocomplete && this.autocomplete.handleKeyupGuard(event)) {
+            event.preventDefault();
+            return;
+        }
         // Check if it's mobile and return if true
         if ((document.body.classList.contains('is-mobile') || document.body.classList.contains('is-tablet')) && event.key === 'Enter' && !fromSubmitButton) {
             event.preventDefault();  // Prevent default to avoid any other actions like submit
@@ -525,6 +533,10 @@ export class BMOView extends ItemView {
     }
 
     handleKeydown(event: KeyboardEvent) {
+        // Autocompletado: flechas/Enter/Tab/Esc navegan el popup en vez de escribir o enviar.
+        if (this.autocomplete && this.autocomplete.onKeyDown(event)) {
+            return;
+        }
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
         }
@@ -533,6 +545,7 @@ export class BMOView extends ItemView {
     handleInput(event: Event) {
         this.textareaElement.style.height = '29px';
         this.textareaElement.style.height = this.textareaElement.scrollHeight + 'px';
+        this.autocomplete?.onInput();
     }
 
     handleBlur(event: Event) {
@@ -661,6 +674,8 @@ export class BMOView extends ItemView {
         resetActiveRuntime();
         clearSidebarRuntime();
         clearConversationHeaderRuntime();
+        this.autocomplete?.destroy();
+        this.autocomplete = null;
     }
 
 }
